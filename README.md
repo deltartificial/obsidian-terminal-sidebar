@@ -1,30 +1,81 @@
-# Obsidian Sample Plugin
+# Obsidian Terminal Sidebar
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+A powerful terminal plugin for Obsidian that integrates a fully functional terminal directly into your sidebar.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## Features
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+- **Integrated Terminal**: A real terminal embedded in Obsidian's sidebar using xterm.js and node-pty
+- **Customizable**: Configure shell, font size, and cursor behavior
+- **Responsive**: Automatically resizes to fit the sidebar
+- **Easy Access**: Open via ribbon icon or command palette
+- **Full Terminal Support**: All terminal features including colors, cursor movement, and keyboard shortcuts
 
-## First time developing plugins?
+## Installation
 
-Quick starting guide for new plugin devs:
+### Manual Installation
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+1. Download the latest release files: `main.js`, `styles.css`, and `manifest.json`
+2. Create a folder named `obsidian-terminal-sidebar` in your vault's `.obsidian/plugins/` directory
+3. Copy the downloaded files into this folder
+4. Reload Obsidian
+5. Enable "Terminal Sidebar" in Settings → Community plugins
+
+### Development Installation
+
+1. Clone this repository into your vault's `.obsidian/plugins/` folder:
+   ```bash
+   cd /path/to/vault/.obsidian/plugins/
+   git clone https://github.com/yourusername/obsidian-terminal-sidebar.git
+   cd obsidian-terminal-sidebar
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Build the plugin:
+   ```bash
+   npm run build
+   ```
+
+   Or run in development mode with auto-rebuild:
+   ```bash
+   npm run dev
+   ```
+
+4. Reload Obsidian and enable the plugin in Settings
+
+## Usage
+
+### Opening the Terminal
+
+- Click the terminal icon in the left ribbon
+- Or use the command palette (Ctrl/Cmd + P) and search for "Open Terminal"
+
+The terminal will open in the right sidebar and provides a full-featured terminal experience.
+
+### Settings
+
+Access plugin settings via Settings → Terminal Sidebar:
+
+- **Shell**: Path to your preferred shell (defaults to system shell)
+- **Font Size**: Adjust terminal font size in pixels (default: 14)
+- **Cursor Blink**: Enable or disable cursor blinking
+
+## Technical Details
+
+This plugin uses:
+- **xterm.js**: Terminal emulator for the web
+- **node-pty**: Provides real pseudoterminal functionality
+- **Obsidian Plugin API**: For seamless integration with Obsidian
+
+## Requirements
+
+- Obsidian v0.15.0 or higher
+- Node.js v16 or higher (for development)
+
+## Development
 
 ## Releasing new releases
 
