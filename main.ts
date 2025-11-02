@@ -31,11 +31,6 @@ export default class TerminalPlugin extends Plugin {
 			(leaf) => new TerminalView(leaf, this.settings)
 		);
 
-		// Add ribbon icon to open terminal
-		this.addRibbonIcon('terminal', 'Open Terminal', () => {
-			this.activateView();
-		});
-
 		// Add command to open terminal
 		this.addCommand({
 			id: 'open-terminal-view',
@@ -47,6 +42,23 @@ export default class TerminalPlugin extends Plugin {
 
 		// Add settings tab
 		this.addSettingTab(new TerminalSettingTab(this.app, this));
+
+		// Automatically add terminal icon to right sidebar on startup
+		this.app.workspace.onLayoutReady(() => {
+			this.initTerminalView();
+		});
+	}
+
+	private initTerminalView() {
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_TERMINAL);
+
+		// Only create if it doesn't exist
+		if (leaves.length === 0) {
+			this.app.workspace.getRightLeaf(false)?.setViewState({
+				type: VIEW_TYPE_TERMINAL,
+				active: false,
+			});
+		}
 	}
 
 	onunload() {
@@ -123,14 +135,18 @@ class TerminalView extends ItemView {
 		// Create terminal element
 		const terminalEl = container.createDiv({ cls: 'terminal-wrapper' });
 
+		// Get the background color from CSS variable
+		const bgColor = getComputedStyle(document.body).getPropertyValue('--background-secondary').trim() || '#202020';
+		const fgColor = getComputedStyle(document.body).getPropertyValue('--text-normal').trim() || '#cccccc';
+
 		// Initialize xterm.js
 		this.terminal = new Terminal({
 			cursorBlink: this.settings.cursorBlink,
 			fontSize: this.settings.fontSize,
 			fontFamily: 'Menlo, Monaco, "Courier New", monospace',
 			theme: {
-				background: '#1e1e1e',
-				foreground: '#cccccc',
+				background: bgColor,
+				foreground: fgColor,
 			},
 			convertEol: true
 		});
@@ -145,11 +161,10 @@ class TerminalView extends ItemView {
 		// Fit terminal to container
 		this.fitAddon.fit();
 
-		// Welcome message
-		this.terminal.writeln('Terminal Sidebar for Obsidian');
-		this.terminal.writeln('Type commands and press Enter to execute');
-		this.terminal.writeln('');
-		this.writePrompt();
+		// Welcome message and prompt (write immediately without delay)
+		this.terminal.write('Terminal Sidebar for Obsidian\r\n');
+		this.terminal.write('Type commands and press Enter to execute\r\n');
+		this.writePrompt(false);
 
 		// Handle terminal input
 		this.terminal.onData((data: string) => {
@@ -171,8 +186,8 @@ class TerminalView extends ItemView {
 		this.addStyles();
 	}
 
-	private writePrompt() {
-		const prompt = `\r\n\x1b[32m${this.cwd}\x1b[0m $ `;
+	private writePrompt(newLine: boolean = true) {
+		const prompt = `${newLine ? '\r\n' : ''}\x1b[32m${this.cwd}\x1b[0m $ `;
 		this.terminal.write(prompt);
 	}
 

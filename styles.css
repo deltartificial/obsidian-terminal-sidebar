@@ -6,23 +6,37 @@
 	display: flex;
 	flex-direction: column;
 	padding: 0;
-	background-color: var(--background-primary);
+	background-color: var(--background-secondary);
+	overflow: hidden;
 }
 
 .terminal-wrapper {
 	flex: 1;
 	overflow: hidden;
 	padding: 10px;
-	background-color: #1e1e1e;
+	background-color: var(--background-secondary);
+	display: flex;
+	flex-direction: column;
+	position: relative;
 }
 
 .terminal-wrapper .xterm {
 	height: 100%;
-	padding: 5px;
+	padding: 0;
+	margin: 0;
+}
+
+/* Hide the xterm helpers and decorations */
+.terminal-wrapper .xterm-helpers {
+	display: none !important;
+}
+
+.terminal-wrapper .xterm-helper-textarea {
+	display: none !important;
 }
 
 .terminal-wrapper .xterm-viewport {
-	background-color: #1e1e1e !important;
+	background-color: var(--background-secondary) !important;
 }
 
 /* Custom scrollbar for terminal */
@@ -31,16 +45,16 @@
 }
 
 .terminal-wrapper .xterm-viewport::-webkit-scrollbar-track {
-	background: #1e1e1e;
+	background: var(--background-secondary);
 }
 
 .terminal-wrapper .xterm-viewport::-webkit-scrollbar-thumb {
-	background: #555;
+	background: var(--background-modifier-border);
 	border-radius: 5px;
 }
 
 .terminal-wrapper .xterm-viewport::-webkit-scrollbar-thumb:hover {
-	background: #777;
+	background: var(--text-muted);
 }
 
 /* Terminal selection style */
@@ -56,4 +70,13 @@
 .workspace-leaf-content[data-type="terminal-view"] .view-content {
 	padding: 0;
 	height: 100%;
+}
+
+/* Hide any initial cursor or input line before terminal is ready */
+.terminal-wrapper .xterm-screen {
+	position: relative;
+}
+
+.terminal-wrapper .xterm-cursor-layer {
+	z-index: 1;
 }
