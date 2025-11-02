@@ -161,9 +161,7 @@ class TerminalView extends ItemView {
 		// Fit terminal to container
 		this.fitAddon.fit();
 
-		// Welcome message and prompt (write immediately without delay)
-		this.terminal.write('Terminal Sidebar for Obsidian\r\n');
-		this.terminal.write('Type commands and press Enter to execute\r\n');
+		// Write prompt directly without welcome message
 		this.writePrompt(false);
 
 		// Handle terminal input

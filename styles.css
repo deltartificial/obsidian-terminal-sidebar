@@ -26,13 +26,15 @@
 	margin: 0;
 }
 
-/* Hide the xterm helpers and decorations */
+/* Keep helpers functional but invisible */
 .terminal-wrapper .xterm-helpers {
-	display: none !important;
+	opacity: 0 !important;
+	position: absolute !important;
+	pointer-events: none !important;
 }
 
 .terminal-wrapper .xterm-helper-textarea {
-	display: none !important;
+	opacity: 0 !important;
 }
 
 .terminal-wrapper .xterm-viewport {
@@ -79,4 +81,19 @@
 
 .terminal-wrapper .xterm-cursor-layer {
 	z-index: 1;
+}
+
+/* Remove any extra decorations or borders from xterm */
+.terminal-wrapper .xterm-decoration-container {
+	display: none !important;
+}
+
+.terminal-wrapper .xterm-decoration-overview-ruler {
+	display: none !important;
+}
+
+/* Ensure clean top alignment */
+.terminal-wrapper .xterm-rows {
+	margin-top: 0 !important;
+	padding-top: 0 !important;
 }
