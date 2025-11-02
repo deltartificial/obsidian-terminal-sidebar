@@ -8,15 +8,71 @@ import * as path from 'path';
 const VIEW_TYPE_TERMINAL = 'terminal-view';
 
 interface TerminalPluginSettings {
+	// Shell settings
 	shell: string;
+	startupDirectory: string;
+
+	// Appearance
 	fontSize: number;
+	fontFamily: string;
+	lineHeight: number;
+	letterSpacing: number;
+
+	// Colors
+	useCustomColors: boolean;
+	backgroundColor: string;
+	foregroundColor: string;
+	cursorColor: string;
+	selectionColor: string;
+
+	// Cursor
 	cursorBlink: boolean;
+	cursorStyle: 'block' | 'underline' | 'bar';
+
+	// Behavior
+	scrollback: number;
+	fastScrollModifier: 'alt' | 'shift' | 'ctrl';
+	copyOnSelect: boolean;
+	rightClickSelectsWord: boolean;
+
+	// Advanced
+	bellSound: boolean;
+	allowTransparency: boolean;
+	macOptionIsMeta: boolean;
 }
 
 const DEFAULT_SETTINGS: TerminalPluginSettings = {
+	// Shell settings
 	shell: os.platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash',
+	startupDirectory: '',
+
+	// Appearance
 	fontSize: 14,
-	cursorBlink: true
+	fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+	lineHeight: 1.0,
+	letterSpacing: 0,
+
+	// Colors
+	useCustomColors: false,
+	backgroundColor: '#1e1e1e',
+	foregroundColor: '#cccccc',
+	cursorColor: '#ffffff',
+	selectionColor: 'rgba(255, 255, 255, 0.3)',
+
+	// Cursor
+	cursorBlink: true,
+	cursorStyle: 'block',
+
+	// Behavior
+	scrollback: 1000,
+	fastScrollModifier: 'alt',
+	copyOnSelect: false,
+	rightClickSelectsWord: true,
+
+	// Advanced
+	bellSound: false,
+	allowTransparency: false,
+	macOptionIsMeta: false,
 }
 
 export default class TerminalPlugin extends Plugin {
@@ -112,7 +168,12 @@ class TerminalView extends ItemView {
 	constructor(leaf: WorkspaceLeaf, settings: TerminalPluginSettings) {
 		super(leaf);
 		this.settings = settings;
-		this.cwd = process.env.HOME || process.env.USERPROFILE || os.homedir();
+		// Use custom startup directory if set, otherwise use home
+		if (this.settings.startupDirectory && this.settings.startupDirectory.trim()) {
+			this.cwd = this.settings.startupDirectory.trim();
+		} else {
+			this.cwd = process.env.HOME || process.env.USERPROFILE || os.homedir();
+		}
 	}
 
 	getViewType(): string {
@@ -135,19 +196,48 @@ class TerminalView extends ItemView {
 		// Create terminal element
 		const terminalEl = container.createDiv({ cls: 'terminal-wrapper' });
 
-		// Get the background color from CSS variable
-		const bgColor = getComputedStyle(document.body).getPropertyValue('--background-secondary').trim() || '#202020';
-		const fgColor = getComputedStyle(document.body).getPropertyValue('--text-normal').trim() || '#cccccc';
+		// Determine colors based on settings
+		let bgColor, fgColor, cursorColor, selectionColor;
 
-		// Initialize xterm.js
+		if (this.settings.useCustomColors) {
+			bgColor = this.settings.backgroundColor;
+			fgColor = this.settings.foregroundColor;
+			cursorColor = this.settings.cursorColor;
+			selectionColor = this.settings.selectionColor;
+		} else {
+			bgColor = getComputedStyle(document.body).getPropertyValue('--background-secondary').trim() || '#202020';
+			fgColor = getComputedStyle(document.body).getPropertyValue('--text-normal').trim() || '#cccccc';
+			cursorColor = getComputedStyle(document.body).getPropertyValue('--text-accent').trim() || '#ffffff';
+			selectionColor = 'rgba(255, 255, 255, 0.3)';
+		}
+
+		// Initialize xterm.js with all settings
 		this.terminal = new Terminal({
+			// Appearance
 			cursorBlink: this.settings.cursorBlink,
+			cursorStyle: this.settings.cursorStyle,
 			fontSize: this.settings.fontSize,
-			fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+			fontFamily: this.settings.fontFamily,
+			lineHeight: this.settings.lineHeight,
+			letterSpacing: this.settings.letterSpacing,
+
+			// Theme
 			theme: {
 				background: bgColor,
 				foreground: fgColor,
+				cursor: cursorColor,
+				selectionBackground: selectionColor,
 			},
+
+			// Behavior
+			scrollback: this.settings.scrollback,
+			fastScrollModifier: this.settings.fastScrollModifier,
+			rightClickSelectsWord: this.settings.rightClickSelectsWord,
+
+			// Advanced
+			allowTransparency: this.settings.allowTransparency,
+			macOptionIsMeta: this.settings.macOptionIsMeta,
+
 			convertEol: true
 		});
 
@@ -168,6 +258,25 @@ class TerminalView extends ItemView {
 		this.terminal.onData((data: string) => {
 			this.handleInput(data);
 		});
+
+		// Handle selection copy
+		if (this.settings.copyOnSelect) {
+			this.terminal.onSelectionChange(() => {
+				const selection = this.terminal.getSelection();
+				if (selection) {
+					navigator.clipboard.writeText(selection);
+				}
+			});
+		}
+
+		// Handle bell
+		if (this.settings.bellSound) {
+			this.terminal.onBell(() => {
+				// Play system bell sound
+				const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBDGH0fPTgjMGHm7A7+OZWBE=');
+				audio.play();
+			});
+		}
 
 		// Handle window resize
 		const resizeObserver = new ResizeObserver(() => {
@@ -338,11 +447,39 @@ class TerminalSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'Terminal Settings' });
+		containerEl.createEl('h1', { text: 'Terminal Sidebar Settings' });
+
+		// Add Apply Changes button at the top
+		new Setting(containerEl)
+			.setName('Apply Changes')
+			.setDesc('Reload the terminal to apply all changes')
+			.addButton(button => button
+				.setButtonText('Reload Terminal')
+				.setCta()
+				.onClick(async () => {
+					// Close all terminal views
+					this.plugin.app.workspace.detachLeavesOfType(VIEW_TYPE_TERMINAL);
+					// Wait a bit
+					await new Promise(resolve => setTimeout(resolve, 100));
+					// Reopen terminal
+					await this.plugin.activateView();
+					// Scroll to top after a small delay to let the view render
+					await new Promise(resolve => setTimeout(resolve, 50));
+					const terminalLeaf = this.plugin.app.workspace.getLeavesOfType(VIEW_TYPE_TERMINAL)[0];
+					if (terminalLeaf) {
+						const viewContent = terminalLeaf.view.containerEl.querySelector('.view-content');
+						if (viewContent) {
+							viewContent.scrollTop = 0;
+						}
+					}
+				}));
+
+		// ========== Shell Settings ==========
+		containerEl.createEl('h2', { text: 'Shell' });
 
 		new Setting(containerEl)
-			.setName('Shell')
-			.setDesc('Path to shell executable')
+			.setName('Shell Path')
+			.setDesc('Path to your preferred shell executable')
 			.addText(text => text
 				.setPlaceholder(DEFAULT_SETTINGS.shell)
 				.setValue(this.plugin.settings.shell)
@@ -350,6 +487,20 @@ class TerminalSettingTab extends PluginSettingTab {
 					this.plugin.settings.shell = value || DEFAULT_SETTINGS.shell;
 					await this.plugin.saveSettings();
 				}));
+
+		new Setting(containerEl)
+			.setName('Startup Directory')
+			.setDesc('Directory to start in (leave empty for home directory)')
+			.addText(text => text
+				.setPlaceholder(os.homedir())
+				.setValue(this.plugin.settings.startupDirectory)
+				.onChange(async (value) => {
+					this.plugin.settings.startupDirectory = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// ========== Appearance Settings ==========
+		containerEl.createEl('h2', { text: 'Appearance' });
 
 		new Setting(containerEl)
 			.setName('Font Size')
@@ -366,13 +517,217 @@ class TerminalSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
+			.setName('Font Family')
+			.setDesc('Terminal font family (use monospace fonts)')
+			.addText(text => text
+				.setPlaceholder(DEFAULT_SETTINGS.fontFamily)
+				.setValue(this.plugin.settings.fontFamily)
+				.onChange(async (value) => {
+					this.plugin.settings.fontFamily = value || DEFAULT_SETTINGS.fontFamily;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Line Height')
+			.setDesc('Spacing between lines (1.0 = normal, 1.2 = more space)')
+			.addText(text => text
+				.setPlaceholder(String(DEFAULT_SETTINGS.lineHeight))
+				.setValue(String(this.plugin.settings.lineHeight))
+				.onChange(async (value) => {
+					const height = parseFloat(value);
+					if (!isNaN(height) && height > 0) {
+						this.plugin.settings.lineHeight = height;
+						await this.plugin.saveSettings();
+					}
+				}));
+
+		new Setting(containerEl)
+			.setName('Letter Spacing')
+			.setDesc('Space between characters in pixels')
+			.addText(text => text
+				.setPlaceholder(String(DEFAULT_SETTINGS.letterSpacing))
+				.setValue(String(this.plugin.settings.letterSpacing))
+				.onChange(async (value) => {
+					const spacing = parseInt(value);
+					if (!isNaN(spacing)) {
+						this.plugin.settings.letterSpacing = spacing;
+						await this.plugin.saveSettings();
+					}
+				}));
+
+		// ========== Color Settings ==========
+		containerEl.createEl('h2', { text: 'Colors' });
+
+		new Setting(containerEl)
+			.setName('Use Custom Colors')
+			.setDesc('Enable custom color scheme (disable to use Obsidian theme colors)')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.useCustomColors)
+				.onChange(async (value) => {
+					this.plugin.settings.useCustomColors = value;
+					await this.plugin.saveSettings();
+					this.display(); // Refresh to show/hide color pickers
+				}));
+
+		if (this.plugin.settings.useCustomColors) {
+			new Setting(containerEl)
+				.setName('Background Color')
+				.setDesc('Terminal background color (hex or rgba)')
+				.addText(text => text
+					.setPlaceholder(DEFAULT_SETTINGS.backgroundColor)
+					.setValue(this.plugin.settings.backgroundColor)
+					.onChange(async (value) => {
+						this.plugin.settings.backgroundColor = value || DEFAULT_SETTINGS.backgroundColor;
+						await this.plugin.saveSettings();
+					}));
+
+			new Setting(containerEl)
+				.setName('Text Color')
+				.setDesc('Terminal text color (hex or rgba)')
+				.addText(text => text
+					.setPlaceholder(DEFAULT_SETTINGS.foregroundColor)
+					.setValue(this.plugin.settings.foregroundColor)
+					.onChange(async (value) => {
+						this.plugin.settings.foregroundColor = value || DEFAULT_SETTINGS.foregroundColor;
+						await this.plugin.saveSettings();
+					}));
+
+			new Setting(containerEl)
+				.setName('Cursor Color')
+				.setDesc('Cursor color (hex or rgba)')
+				.addText(text => text
+					.setPlaceholder(DEFAULT_SETTINGS.cursorColor)
+					.setValue(this.plugin.settings.cursorColor)
+					.onChange(async (value) => {
+						this.plugin.settings.cursorColor = value || DEFAULT_SETTINGS.cursorColor;
+						await this.plugin.saveSettings();
+					}));
+
+			new Setting(containerEl)
+				.setName('Selection Color')
+				.setDesc('Selected text background (hex or rgba)')
+				.addText(text => text
+					.setPlaceholder(DEFAULT_SETTINGS.selectionColor)
+					.setValue(this.plugin.settings.selectionColor)
+					.onChange(async (value) => {
+						this.plugin.settings.selectionColor = value || DEFAULT_SETTINGS.selectionColor;
+						await this.plugin.saveSettings();
+					}));
+		}
+
+		// ========== Cursor Settings ==========
+		containerEl.createEl('h2', { text: 'Cursor' });
+
+		new Setting(containerEl)
 			.setName('Cursor Blink')
-			.setDesc('Enable cursor blinking')
+			.setDesc('Enable cursor blinking animation')
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.cursorBlink)
 				.onChange(async (value) => {
 					this.plugin.settings.cursorBlink = value;
 					await this.plugin.saveSettings();
 				}));
+
+		new Setting(containerEl)
+			.setName('Cursor Style')
+			.setDesc('Choose cursor appearance')
+			.addDropdown(dropdown => dropdown
+				.addOption('block', 'Block')
+				.addOption('underline', 'Underline')
+				.addOption('bar', 'Bar')
+				.setValue(this.plugin.settings.cursorStyle)
+				.onChange(async (value: 'block' | 'underline' | 'bar') => {
+					this.plugin.settings.cursorStyle = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// ========== Behavior Settings ==========
+		containerEl.createEl('h2', { text: 'Behavior' });
+
+		new Setting(containerEl)
+			.setName('Scrollback Lines')
+			.setDesc('Number of lines to keep in history (1000-50000)')
+			.addText(text => text
+				.setPlaceholder(String(DEFAULT_SETTINGS.scrollback))
+				.setValue(String(this.plugin.settings.scrollback))
+				.onChange(async (value) => {
+					const lines = parseInt(value);
+					if (!isNaN(lines) && lines >= 1000 && lines <= 50000) {
+						this.plugin.settings.scrollback = lines;
+						await this.plugin.saveSettings();
+					}
+				}));
+
+		new Setting(containerEl)
+			.setName('Fast Scroll Modifier')
+			.setDesc('Key to hold for faster scrolling')
+			.addDropdown(dropdown => dropdown
+				.addOption('alt', 'Alt')
+				.addOption('shift', 'Shift')
+				.addOption('ctrl', 'Ctrl')
+				.setValue(this.plugin.settings.fastScrollModifier)
+				.onChange(async (value: 'alt' | 'shift' | 'ctrl') => {
+					this.plugin.settings.fastScrollModifier = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Copy on Select')
+			.setDesc('Automatically copy selected text to clipboard')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.copyOnSelect)
+				.onChange(async (value) => {
+					this.plugin.settings.copyOnSelect = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Right Click Selects Word')
+			.setDesc('Right-click selects the word under cursor')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.rightClickSelectsWord)
+				.onChange(async (value) => {
+					this.plugin.settings.rightClickSelectsWord = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// ========== Advanced Settings ==========
+		containerEl.createEl('h2', { text: 'Advanced' });
+
+		new Setting(containerEl)
+			.setName('Bell Sound')
+			.setDesc('Play sound when terminal bell character is received')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.bellSound)
+				.onChange(async (value) => {
+					this.plugin.settings.bellSound = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Allow Transparency')
+			.setDesc('Enable terminal background transparency (requires custom colors)')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.allowTransparency)
+				.onChange(async (value) => {
+					this.plugin.settings.allowTransparency = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Mac Option is Meta')
+			.setDesc('Treat Option key as Meta on macOS')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.macOptionIsMeta)
+				.onChange(async (value) => {
+					this.plugin.settings.macOptionIsMeta = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// Info footer
+		containerEl.createEl('p', {
+			text: 'Tip: Use the "Reload Terminal" button above to apply changes immediately.',
+			cls: 'setting-item-description'
+		});
 	}
 }
