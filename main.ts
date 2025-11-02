@@ -238,7 +238,8 @@ class TerminalView extends ItemView {
 			allowTransparency: this.settings.allowTransparency,
 			macOptionIsMeta: this.settings.macOptionIsMeta,
 
-			convertEol: true
+			convertEol: true,
+			rows: 24  // Start with fewer rows
 		});
 
 		// Add fit addon
@@ -251,8 +252,21 @@ class TerminalView extends ItemView {
 		// Fit terminal to container
 		this.fitAddon.fit();
 
-		// Write prompt directly without welcome message
-		this.writePrompt(false);
+		// Clear any initial buffer content
+		this.terminal.clear();
+
+		// Write prompt directly without welcome message (don't scroll yet)
+		this.writePrompt(false, false);
+
+		// Force scroll to top multiple times to ensure it works
+		setTimeout(() => {
+			this.terminal.scrollToTop();
+			// Reset viewport scroll as well
+			const viewport = terminalEl.querySelector('.xterm-viewport') as HTMLElement;
+			if (viewport) {
+				viewport.scrollTop = 0;
+			}
+		}, 50);
 
 		// Handle terminal input
 		this.terminal.onData((data: string) => {
@@ -293,9 +307,13 @@ class TerminalView extends ItemView {
 		this.addStyles();
 	}
 
-	private writePrompt(newLine: boolean = true) {
+	private writePrompt(newLine: boolean = true, scrollToBottom: boolean = true) {
 		const prompt = `${newLine ? '\r\n' : ''}\x1b[32m${this.cwd}\x1b[0m $ `;
 		this.terminal.write(prompt);
+		// Only scroll to bottom if requested (not on initial load)
+		if (scrollToBottom) {
+			this.terminal.scrollToBottom();
+		}
 	}
 
 	private handleInput(data: string) {
@@ -335,7 +353,15 @@ class TerminalView extends ItemView {
 
 		if (command === 'clear' || command === 'cls') {
 			this.terminal.clear();
-			this.writePrompt();
+			this.writePrompt(false, false);
+			// Force scroll to top after clear
+			setTimeout(() => {
+				this.terminal.scrollToTop();
+				const viewport = this.containerEl.querySelector('.xterm-viewport') as HTMLElement;
+				if (viewport) {
+					viewport.scrollTop = 0;
+				}
+			}, 10);
 			return;
 		}
 
@@ -504,16 +530,14 @@ class TerminalSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Font Size')
-			.setDesc('Terminal font size in pixels')
-			.addText(text => text
-				.setPlaceholder(String(DEFAULT_SETTINGS.fontSize))
-				.setValue(String(this.plugin.settings.fontSize))
+			.setDesc('Terminal font size in pixels (8-32)')
+			.addSlider(slider => slider
+				.setLimits(8, 32, 1)
+				.setValue(this.plugin.settings.fontSize)
+				.setDynamicTooltip()
 				.onChange(async (value) => {
-					const size = parseInt(value);
-					if (!isNaN(size) && size > 0) {
-						this.plugin.settings.fontSize = size;
-						await this.plugin.saveSettings();
-					}
+					this.plugin.settings.fontSize = value;
+					await this.plugin.saveSettings();
 				}));
 
 		new Setting(containerEl)
@@ -529,30 +553,26 @@ class TerminalSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Line Height')
-			.setDesc('Spacing between lines (1.0 = normal, 1.2 = more space)')
-			.addText(text => text
-				.setPlaceholder(String(DEFAULT_SETTINGS.lineHeight))
-				.setValue(String(this.plugin.settings.lineHeight))
+			.setDesc('Spacing between lines (0.8-2.0)')
+			.addSlider(slider => slider
+				.setLimits(0.8, 2.0, 0.1)
+				.setValue(this.plugin.settings.lineHeight)
+				.setDynamicTooltip()
 				.onChange(async (value) => {
-					const height = parseFloat(value);
-					if (!isNaN(height) && height > 0) {
-						this.plugin.settings.lineHeight = height;
-						await this.plugin.saveSettings();
-					}
+					this.plugin.settings.lineHeight = value;
+					await this.plugin.saveSettings();
 				}));
 
 		new Setting(containerEl)
 			.setName('Letter Spacing')
-			.setDesc('Space between characters in pixels')
-			.addText(text => text
-				.setPlaceholder(String(DEFAULT_SETTINGS.letterSpacing))
-				.setValue(String(this.plugin.settings.letterSpacing))
+			.setDesc('Space between characters in pixels (-5 to 10)')
+			.addSlider(slider => slider
+				.setLimits(-5, 10, 1)
+				.setValue(this.plugin.settings.letterSpacing)
+				.setDynamicTooltip()
 				.onChange(async (value) => {
-					const spacing = parseInt(value);
-					if (!isNaN(spacing)) {
-						this.plugin.settings.letterSpacing = spacing;
-						await this.plugin.saveSettings();
-					}
+					this.plugin.settings.letterSpacing = value;
+					await this.plugin.saveSettings();
 				}));
 
 		// ========== Color Settings ==========
@@ -572,46 +592,75 @@ class TerminalSettingTab extends PluginSettingTab {
 		if (this.plugin.settings.useCustomColors) {
 			new Setting(containerEl)
 				.setName('Background Color')
-				.setDesc('Terminal background color (hex or rgba)')
-				.addText(text => text
-					.setPlaceholder(DEFAULT_SETTINGS.backgroundColor)
+				.setDesc('Terminal background color')
+				.addColorPicker(color => color
 					.setValue(this.plugin.settings.backgroundColor)
 					.onChange(async (value) => {
-						this.plugin.settings.backgroundColor = value || DEFAULT_SETTINGS.backgroundColor;
+						this.plugin.settings.backgroundColor = value;
 						await this.plugin.saveSettings();
+					}))
+				.addExtraButton(button => button
+					.setIcon('reset')
+					.setTooltip('Reset to default')
+					.onClick(async () => {
+						this.plugin.settings.backgroundColor = DEFAULT_SETTINGS.backgroundColor;
+						await this.plugin.saveSettings();
+						this.display();
 					}));
 
 			new Setting(containerEl)
 				.setName('Text Color')
-				.setDesc('Terminal text color (hex or rgba)')
-				.addText(text => text
-					.setPlaceholder(DEFAULT_SETTINGS.foregroundColor)
+				.setDesc('Terminal text color')
+				.addColorPicker(color => color
 					.setValue(this.plugin.settings.foregroundColor)
 					.onChange(async (value) => {
-						this.plugin.settings.foregroundColor = value || DEFAULT_SETTINGS.foregroundColor;
+						this.plugin.settings.foregroundColor = value;
 						await this.plugin.saveSettings();
+					}))
+				.addExtraButton(button => button
+					.setIcon('reset')
+					.setTooltip('Reset to default')
+					.onClick(async () => {
+						this.plugin.settings.foregroundColor = DEFAULT_SETTINGS.foregroundColor;
+						await this.plugin.saveSettings();
+						this.display();
 					}));
 
 			new Setting(containerEl)
 				.setName('Cursor Color')
-				.setDesc('Cursor color (hex or rgba)')
-				.addText(text => text
-					.setPlaceholder(DEFAULT_SETTINGS.cursorColor)
+				.setDesc('Cursor color')
+				.addColorPicker(color => color
 					.setValue(this.plugin.settings.cursorColor)
 					.onChange(async (value) => {
-						this.plugin.settings.cursorColor = value || DEFAULT_SETTINGS.cursorColor;
+						this.plugin.settings.cursorColor = value;
 						await this.plugin.saveSettings();
+					}))
+				.addExtraButton(button => button
+					.setIcon('reset')
+					.setTooltip('Reset to default')
+					.onClick(async () => {
+						this.plugin.settings.cursorColor = DEFAULT_SETTINGS.cursorColor;
+						await this.plugin.saveSettings();
+						this.display();
 					}));
 
 			new Setting(containerEl)
 				.setName('Selection Color')
-				.setDesc('Selected text background (hex or rgba)')
+				.setDesc('Selected text background (Note: color picker may not support transparency)')
 				.addText(text => text
 					.setPlaceholder(DEFAULT_SETTINGS.selectionColor)
 					.setValue(this.plugin.settings.selectionColor)
 					.onChange(async (value) => {
 						this.plugin.settings.selectionColor = value || DEFAULT_SETTINGS.selectionColor;
 						await this.plugin.saveSettings();
+					}))
+				.addExtraButton(button => button
+					.setIcon('reset')
+					.setTooltip('Reset to default')
+					.onClick(async () => {
+						this.plugin.settings.selectionColor = DEFAULT_SETTINGS.selectionColor;
+						await this.plugin.saveSettings();
+						this.display();
 					}));
 		}
 
@@ -647,15 +696,13 @@ class TerminalSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('Scrollback Lines')
 			.setDesc('Number of lines to keep in history (1000-50000)')
-			.addText(text => text
-				.setPlaceholder(String(DEFAULT_SETTINGS.scrollback))
-				.setValue(String(this.plugin.settings.scrollback))
+			.addSlider(slider => slider
+				.setLimits(1000, 50000, 1000)
+				.setValue(this.plugin.settings.scrollback)
+				.setDynamicTooltip()
 				.onChange(async (value) => {
-					const lines = parseInt(value);
-					if (!isNaN(lines) && lines >= 1000 && lines <= 50000) {
-						this.plugin.settings.scrollback = lines;
-						await this.plugin.saveSettings();
-					}
+					this.plugin.settings.scrollback = value;
+					await this.plugin.saveSettings();
 				}));
 
 		new Setting(containerEl)

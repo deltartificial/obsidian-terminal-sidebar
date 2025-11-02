@@ -8,6 +8,7 @@
 	padding: 0;
 	background-color: var(--background-secondary);
 	overflow: hidden;
+	position: relative;
 }
 
 .terminal-wrapper {
@@ -18,12 +19,15 @@
 	display: flex;
 	flex-direction: column;
 	position: relative;
+	min-height: 0;
 }
 
 .terminal-wrapper .xterm {
 	height: 100%;
+	width: 100%;
 	padding: 0;
 	margin: 0;
+	overflow: hidden;
 }
 
 /* Keep helpers functional but invisible */
@@ -96,4 +100,11 @@
 .terminal-wrapper .xterm-rows {
 	margin-top: 0 !important;
 	padding-top: 0 !important;
+}
+
+/* Fix scroll positioning */
+.terminal-wrapper .xterm .xterm-screen {
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start;
 }
